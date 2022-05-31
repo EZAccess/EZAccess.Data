@@ -8,11 +8,18 @@ public class EZField
     private readonly string _fieldName;
     private readonly PropertyInfo _fieldInfo;
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="fieldName"></param>
+    /// <exception cref="ArgumentException"></exception>
     public EZField(Type model, string fieldName)
     {
         _model = model;
         _fieldName = fieldName;
         var p = _model.GetProperty(_fieldName);
+
         if (p != null)
         {
             _fieldInfo = p;

@@ -63,7 +63,6 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// <param name="data">Data of TModel that contain the raw data of the record</param>
     /// <param name="readRecord">Delegate to execute when e refresh is required</param>
     /// <param name="onParametersChanged">Action that is executed when any property of the record is changed</param>
-    /// <param name="onDataChanged">Action that is executed when the Data of the record is changed</param>
     public EZRecord(TModel data, 
                     Func<TModel, Task<EZActionResult<TModel?>>> readRecord,
                     Action<EZRecordsetStateHasChangedEventArgs>? onStateHasChanged)
