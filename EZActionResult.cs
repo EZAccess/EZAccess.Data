@@ -2,6 +2,10 @@
 
 namespace EZAccess.Data;
 
+/// <summary>
+/// 
+/// </summary>
+/// <typeparam name="TModel"></typeparam>
 public class EZActionResult<TModel>
 {
     public TModel? Content { get; set; }
