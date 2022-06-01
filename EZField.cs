@@ -116,6 +116,14 @@ public class EZField
             return false;
         }
     }
+
+    public Type? SystemType
+    {
+        get
+        {
+            return _fieldInfo.GetType();
+        }
+    }
 }
 
 //AssociatedMetadataTypeTypeDescriptionProvider

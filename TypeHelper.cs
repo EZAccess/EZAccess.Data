@@ -10,7 +10,7 @@ public static class TypeHelper
     /// <returns>Returns true is the type is in the list. Returns false if it doesn't</returns>
     public static bool IsNumeric(this Type myType)
     {
-        var x = Nullable.GetUnderlyingType(myType);
+        Type x = Nullable.GetUnderlyingType(myType) ?? myType;
         if (x == typeof(int) || x == typeof(double) || x == typeof(decimal) ||
             x == typeof(long) || x == typeof(short) || x == typeof(byte) ||
             x == typeof(ulong) || x == typeof(ushort) || x == typeof(float) ||
@@ -29,7 +29,7 @@ public static class TypeHelper
     /// <returns>Returns true is the type is in the list. Returns false if it doesn't</returns>
     public static bool IsDate(this Type myType)
     {
-        var x = Nullable.GetUnderlyingType(myType);
+        Type x = Nullable.GetUnderlyingType(myType) ?? myType;
         if (x == typeof(DateTime) || x == typeof(DateOnly) || x == typeof(TimeOnly) ||
             x == typeof(DateTimeOffset))
         {
@@ -46,7 +46,7 @@ public static class TypeHelper
     /// <returns>Returns true is the type is bool. Returns false if it doesn't</returns>
     public static bool IsBoolean(this Type myType)
     {
-        var x = Nullable.GetUnderlyingType(myType);
+        Type x = Nullable.GetUnderlyingType(myType) ?? myType;
         if (x == typeof(bool))
         {
             return true;
