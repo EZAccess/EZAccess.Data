@@ -12,18 +12,23 @@ public class EZRecordset<TModel> where TModel : new()
     public List<TModel> Data { get; private set; }
 
     /// <summary>
-    /// Return the data as list of tupels. The Records derive CRUD functions from the RecordSet object.
+    /// Return the data as list of records. The Records derive CRUD functions from the RecordSet object.
     /// </summary>
     public List<EZRecord<TModel>> Records { get; private set; }
+
+    /// <summary>
+    /// Return a single record that is currently selected
+    /// </summary>
+    public EZRecord<TModel>? SelectedRecord { get; private set; }
 
     /// <summary>
     /// Busy during execution of async actions
     /// </summary>
     public bool IsBusy { get; private set; }
 
-//    public Dictionary<string, List<string>>? ValidationErrors { get; private set; }
     public string? ErrorMessage { get; private set; }
     public bool HasFailedOperation { get; private set; }
+    public bool IsReadOnly { get; private set; }
 
     #endregion
 
@@ -52,7 +57,9 @@ public class EZRecordset<TModel> where TModel : new()
     {
         Data = data;
         Records = new List<EZRecord<TModel>>();
+        SelectedRecord = Records.FirstOrDefault();
         RefreshRecordSet();
+        IsReadOnly = true;
     }
 
     /// <summary>
@@ -66,6 +73,7 @@ public class EZRecordset<TModel> where TModel : new()
         Records = new List<EZRecord<TModel>>();
         _getAllRecords += getAllRecords;
         _where = where;
+        IsReadOnly = true;
     }
 
     /// <summary>
@@ -82,6 +90,7 @@ public class EZRecordset<TModel> where TModel : new()
         _getAllRecords += getAllRecords;
         _where = where;
         _readRecord += readRecord;
+        IsReadOnly = true;
     }
 
     /// <summary>
@@ -107,10 +116,11 @@ public class EZRecordset<TModel> where TModel : new()
         _readRecord += readRecord;
         _updateRecord += updateRecord;
         _deleteRecord += deleteRecord;
+        IsReadOnly = false;
     }
 
     #endregion
-    
+
     public void StartRefreshData()
     {
         Task.Run(RefreshDataAsync);
@@ -184,6 +194,7 @@ public class EZRecordset<TModel> where TModel : new()
                 AddNewRecord(new TModel());
             }
         }
+        SelectedRecord = Records.FirstOrDefault();
 
     }
 
