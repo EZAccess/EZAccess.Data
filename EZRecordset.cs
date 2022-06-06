@@ -49,6 +49,16 @@ public class EZRecordset<TModel> where TModel : new()
     {
         get { return _changedRecords.Count; }
     }
+
+    /// <summary>
+    /// returns the number of records that are invalid and cannot be saved.
+    /// </summary>
+    public int InvalidRecordsCount 
+    {
+        get { return _invalidRecords.Count; }
+    }
+
+
     #endregion
 
     #region Public Editable Properties
@@ -70,6 +80,7 @@ public class EZRecordset<TModel> where TModel : new()
     private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _updateRecord;
     private readonly Func<TModel, Task<EZActionResult<bool>>>? _deleteRecord;
     private readonly List<EZRecord<TModel>> _changedRecords = new();
+    private readonly List<EZRecord<TModel>> _invalidRecords = new();
     #endregion
 
     #region Public Events
@@ -258,7 +269,7 @@ public class EZRecordset<TModel> where TModel : new()
     {
         foreach (var record in _changedRecords)
         {
-            if (!record.IsBusy)
+            if (!record.IsBusy && !record.HasValidationErrors)
             {
                 record.SaveChanges();
             }
@@ -364,7 +375,21 @@ public class EZRecordset<TModel> where TModel : new()
             if (changedRecord.IsChanged)
             {
                 _changedRecords.Add(changedRecord);
-                //_onChange?.Invoke();
+            }
+        }
+
+        if (_invalidRecords.Contains(changedRecord))
+        {
+            if (!changedRecord.HasValidationErrors)
+            {
+                _invalidRecords.Remove(changedRecord);
+            }
+        }
+        else
+        {
+            if (changedRecord.HasValidationErrors)
+            {
+                _invalidRecords.Add(changedRecord);
             }
         }
         _onChange?.Invoke();

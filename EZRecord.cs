@@ -14,7 +14,21 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     public bool IsBusy { get; private set; }
     public bool HasFailedOperation { get; private set; }
     public string? ErrorMessage { get; private set; }
-    public Dictionary<string, List<string>>? ValidationErrors { get; private set; }
+    public Dictionary<string, List<string>> ValidationErrors { get; private set; }
+    public bool HasValidationErrors
+    {
+        get { 
+            if (ValidationErrors == null)
+            {
+                return false;
+            }
+            else
+            {
+                return ValidationErrors.Any();
+            }
+        }
+    }
+
     #endregion
 
     #region Private Fields
@@ -47,7 +61,8 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     {
         Model = data;
         IsReadOnly = true;
-        Fields = new List<EZField>();
+        Fields = new();
+        ValidationErrors = new();
         Type type = typeof(TModel);
 
         foreach (var item in type.GetProperties())
@@ -68,7 +83,8 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     {
         Model = data;
         IsReadOnly = true;
-        Fields = new List<EZField>();
+        Fields = new();
+        ValidationErrors = new();
         Type type = typeof(TModel);
 
         foreach (var item in type.GetProperties())
@@ -103,7 +119,8 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     {
         Model = data;
         IsReadOnly = false;
-        Fields = new List<EZField>();
+        Fields = new();
+        ValidationErrors = new();
         Type type = typeof(TModel);
 
         foreach (var item in type.GetProperties())
@@ -142,7 +159,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             {
                 HasFailedOperation = false;
                 IsBusy = true;
-                ValidationErrors = null;
+                ValidationErrors = new();
                 StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
                 BeforeCRUDEventArgs<TModel> args = new(Model);
                 OnBeforeUpdate?.Invoke(this, args);
@@ -160,7 +177,10 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                         {
                             HasFailedOperation = true;
                             ErrorMessage = result.ErrorMessage;
-                            ValidationErrors = result.ValidationErrors;
+                            if (result.ValidationErrors != null)
+                            {
+                                ValidationErrors = result.ValidationErrors;
+                            }
                         }
                     }
                 }
@@ -177,7 +197,10 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                         {
                             HasFailedOperation = true;
                             ErrorMessage = result.ErrorMessage;
-                            ValidationErrors = result.ValidationErrors;
+                            if (result.ValidationErrors != null)
+                            {
+                                ValidationErrors = result.ValidationErrors;
+                            }
                         }
                     }
                 }
@@ -398,7 +421,6 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// <param name="eventArgs">The arguments send with the event by the EditContext object</param>
     public void OnFieldChanged(object? sender, FieldChangedEventArgs eventArgs)
     {
-//        if (IsNewRecord && !IsChanged)
         if (!IsChanged)
         {
             if (IsNewRecord)
@@ -410,17 +432,38 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             IsChanged = true;
             StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, true));
         }
-        if (ValidationErrors != null)
+        // If any changes are made on a field, all custom validation messagesd of this field need to be cleared
+        if (ValidationErrors.Any())
         {
             if (ValidationErrors.ContainsKey(eventArgs.FieldIdentifier.FieldName))
             {
                 ValidationErrors.Remove(eventArgs.FieldIdentifier.FieldName);
-                if (!ValidationErrors.Any())
-                {
-                    ValidationErrors = null;
-                }
                 StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, true));
             }
+        }
+
+    }
+
+    public void OnValidationStateChanged(IEnumerable<string>? validationMessages)
+    {
+        const string key = "EditFormMessages";
+        bool stateChanged = false;
+        if (ValidationErrors.ContainsKey(key))
+        {
+            ValidationErrors.Remove(key);
+            stateChanged = true;
+        }
+        if (validationMessages != null)
+        {
+            if (validationMessages.Any())
+            {
+                ValidationErrors.Add(key, validationMessages.ToList());
+                stateChanged = true;
+            }
+        }
+        if (stateChanged)
+        {
+            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, false));
         }
     }
 
