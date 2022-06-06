@@ -39,12 +39,11 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
 
     #region Class Constructors
 
-
     /// <summary>
     /// Initialize the record with raw data only. No CRUD operations are available
     /// </summary>
     /// <param name="data">Data of TModel that contain the raw data of the record</param>
-    public EZRecord(TModel data)
+    internal EZRecord(TModel data)
     {
         Model = data;
         IsReadOnly = true;
@@ -63,7 +62,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// <param name="data">Data of TModel that contain the raw data of the record</param>
     /// <param name="readRecord">Delegate to execute when e refresh is required</param>
     /// <param name="onParametersChanged">Action that is executed when any property of the record is changed</param>
-    public EZRecord(TModel data, 
+    internal EZRecord(TModel data, 
                     Func<TModel, Task<EZActionResult<TModel?>>> readRecord,
                     Action<EZRecordsetStateHasChangedEventArgs>? onStateHasChanged)
     {
@@ -94,7 +93,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// <param name="deleteRecord">Delegate to execute when a record is deleted</param>
     /// <param name="onStateHasChanged">Action that is executed when the Data of the record is changed</param>
     /// <param name="isNewRecord">Record will be treated as new record</param>
-    public EZRecord(TModel data, 
+    internal EZRecord(TModel data, 
                     Func<TModel, Task<EZActionResult<TModel?>>> createRecord, 
                     Func<TModel, Task<EZActionResult<TModel?>>> readRecord, 
                     Func<TModel, Task<EZActionResult<TModel?>>> updateRecord, 

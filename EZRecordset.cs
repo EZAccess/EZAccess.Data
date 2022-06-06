@@ -4,7 +4,7 @@ namespace EZAccess.Data;
 
 public class EZRecordset<TModel> where TModel : new()
 {
-    #region Public Properties
+    #region Public Readonly Properties
 
     /// <summary>
     /// Return the raw set of data as a List of model type TModel
@@ -26,9 +26,38 @@ public class EZRecordset<TModel> where TModel : new()
     /// </summary>
     public bool IsBusy { get; private set; }
 
+    /// <summary>
+    /// A message available for the UI if something is wrong
+    /// </summary>
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>
+    /// Any CRUD operation did not execute succesfully
+    /// </summary>
     public bool HasFailedOperation { get; private set; }
+
+    /// <summary>
+    /// Informs whether the recordset has CRUD functions (Is not readonly) or
+    /// whether it has not (Is readonly).
+    /// </summary>
     public bool IsReadOnly { get; private set; }
+
+    /// <summary>
+    /// returns the number of records which are changed and not saved.
+    /// </summary>
+    public int ChangedRecordsCount
+    {
+        get { return _changedRecords.Count; }
+    }
+    #endregion
+
+    #region Public Editable Properties
+
+    /// <summary>
+    /// If true then try to save changed records at certain events. If false then
+    /// only save changes by explicit commands.
+    /// </summary>
+    public bool SaveChangesAutomatic { get; set; }
 
     #endregion
 
@@ -40,7 +69,7 @@ public class EZRecordset<TModel> where TModel : new()
     private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _readRecord;
     private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _updateRecord;
     private readonly Func<TModel, Task<EZActionResult<bool>>>? _deleteRecord;
-    private List<EZRecord<TModel>> ChangedRecords = new();
+    private readonly List<EZRecord<TModel>> _changedRecords = new();
     #endregion
 
     #region Public Events
@@ -106,7 +135,8 @@ public class EZRecordset<TModel> where TModel : new()
                        Func<TModel, Task<EZActionResult<TModel?>>> createRecord,
                        Func<TModel, Task<EZActionResult<TModel?>>> readRecord,
                        Func<TModel, Task<EZActionResult<TModel?>>> updateRecord,
-                       Func<TModel, Task<EZActionResult<bool>>> deleteRecord)
+                       Func<TModel, Task<EZActionResult<bool>>> deleteRecord,
+                       bool saveChangesAutomatic = true)
     {
         Data = new List<TModel>();
         Records = new List<EZRecord<TModel>>();
@@ -117,15 +147,28 @@ public class EZRecordset<TModel> where TModel : new()
         _updateRecord += updateRecord;
         _deleteRecord += deleteRecord;
         IsReadOnly = false;
+        SaveChangesAutomatic = saveChangesAutomatic;
     }
 
     #endregion
 
+    #region Core Functions
+
+    /// <summary>
+    /// This function starts the refresh function on a seperate thread. Use the AddOnChangeListener
+    /// to listen to the onchange event when the function is finished. 
+    /// The StartRefreshData is one of the ways to initially populate the recordset.
+    /// </summary>
     public void StartRefreshData()
     {
         Task.Run(RefreshDataAsync);
     }
 
+    /// <summary>
+    /// This function executes the refresh function asynchrious and can be awaited.
+    /// The RefreshDataAsync function is one of the ways to  initially populate the recordset.
+    /// </summary>
+    /// <returns>Returns a Task to execute the RefreshData async</returns>
     public async Task RefreshDataAsync()
     {
         if (IsBusy) { return; }
@@ -166,6 +209,10 @@ public class EZRecordset<TModel> where TModel : new()
         }
     }
 
+    /// <summary>
+    /// This function (re)populates the recordset with records. It is a requirement that 
+    /// the list Data is already populated
+    /// </summary>
     private void RefreshRecordSet()
     {
         Records.Clear();
@@ -178,6 +225,7 @@ public class EZRecordset<TModel> where TModel : new()
         }
         else
         {
+            // If (IsReadOnly) could be used, but the compiler likes this better.
             if (_createRecord == null || _updateRecord == null || _deleteRecord == null)
             {
                 foreach (var item in Data)
@@ -189,54 +237,110 @@ public class EZRecordset<TModel> where TModel : new()
             {
                 foreach (var item in Data)
                 {
-                    Records.Add(new EZRecord<TModel>(item, _createRecord, _readRecord, _updateRecord, _deleteRecord, OnStateHasChanged));
+                    Records.Add(new EZRecord<TModel>(item, 
+                                                          _createRecord, 
+                                                          _readRecord, 
+                                                          _updateRecord, 
+                                                          _deleteRecord, 
+                                                          OnStateHasChanged));
                 }
-                AddNewRecord(new TModel());
+                AddNewRecord2(new TModel());
             }
         }
         SelectedRecord = Records.FirstOrDefault();
 
     }
 
+    /// <summary>
+    /// This function will save all changes known to the recordset.
+    /// </summary>
+    public void SaveAllChanges()
+    {
+        foreach (var record in _changedRecords)
+        {
+            if (!record.IsBusy)
+            {
+                record.SaveChanges();
+            }
+        }
+    }
+
+    /// <summary>
+    /// This function adds a new record to the existing recordset. It will also trigger events.
+    /// </summary>
     public void AddNewRecord()
     {
-        AddNewRecord(new TModel());
+        AddNewRecord2(new TModel());
         RecordsHaveChanged?.Invoke(this, new());
         _onChange?.Invoke();
     }
 
-    private void AddNewRecord(TModel newModel)
+    /// <summary>
+    /// This function adds a single record to the recordset after it is properly initialized.
+    /// No events will be triggered. 
+    /// </summary>
+    /// <param name="newModel">The model that will populate the list Data and is contained by the record</param>
+    private void AddNewRecord2(TModel newModel)
     {
         if (_createRecord != null && _readRecord != null && _updateRecord != null && _deleteRecord != null)
         {
             Data.Add(newModel);
-            Records.Add(new EZRecord<TModel>(newModel, _createRecord, _readRecord, _updateRecord, _deleteRecord, OnStateHasChanged, true));
+            Records.Add(new EZRecord<TModel>(newModel, 
+                                                  _createRecord, 
+                                                  _readRecord, 
+                                                  _updateRecord, 
+                                                  _deleteRecord, 
+                                                  OnStateHasChanged, 
+                                                  true));
         }
     }
 
+    /// <summary>
+    /// This function will remove the record from the list of records, plus the model will
+    /// be removed from the list of Data.
+    /// </summary>
+    /// <param name="deletedRecord">The record that will be removed</param>
     private void RemoveRecord(EZRecord<TModel> deletedRecord)
     {
-        Data.Remove(deletedRecord.Model);
-        Records.Remove(deletedRecord);
-        _onChange?.Invoke();
+        if (Records.Contains(deletedRecord))
+        {
+            Data.Remove(deletedRecord.Model);
+            Records.Remove(deletedRecord);
+            _onChange?.Invoke();
+        }
+        else
+        {
+            throw new InvalidDataException("The record that is requested to be deleted does " +
+                                            "not exist in the list of records of this recordset");
+        }
     }
 
+    /// <summary>
+    /// This is an event listener that routes the different action when any of the member records 
+    /// is changed.
+    /// </summary>
+    /// <param name="args">Eventargs that contain the record that has been changed.</param>
     public void OnStateHasChanged(EZRecordsetStateHasChangedEventArgs args)
     {
         if (args.Record == null) { return; }
         var changedRecord = (EZRecord<TModel>)args.Record;
 
+        // if any change is made to a new record create a new 'new' record. Only do this if the flag
+        // Ischanged is not yet set to true, or the new record is being deleted.
         if (changedRecord.IsNewRecord && !changedRecord.IsChanged && !changedRecord.IsDeleted)
         {
             AddNewRecord();
         }
+        // If the flag IsDeleted is set to true the recordset must remove the record from its lists
         if (changedRecord.IsDeleted)
         {
             RemoveRecord(changedRecord);
         }
-        if (args.TrySaveRecords)
+        // The record will notify that changes to other records may be made. This is only
+        // executed if the setting SaveChangesAutomatic in the recordset is set to true.
+        if (args.TrySaveRecords && SaveChangesAutomatic)
         {
-            foreach (var record in ChangedRecords)
+            foreach (var record in _changedRecords)
             {
                 if (record != changedRecord && !record.IsBusy)
                 {
@@ -244,30 +348,46 @@ public class EZRecordset<TModel> where TModel : new()
                 }
             }
         }
-        if (ChangedRecords.Contains(changedRecord))
+        // Check if the changed record is already member of the collection changed records,
+        // and check whether it should be added or removed.
+        // The collection changed records is recorded to know which records require to be saved
+        // if so requested.
+        if (_changedRecords.Contains(changedRecord))
         {
             if (!changedRecord.IsChanged)
             {
-                ChangedRecords.Remove(changedRecord);
+                _changedRecords.Remove(changedRecord);
             }
         }
         else
         {
             if (changedRecord.IsChanged)
             {
-                ChangedRecords.Add(changedRecord);
+                _changedRecords.Add(changedRecord);
+                //_onChange?.Invoke();
             }
         }
-        //_onChange?.Invoke();
+        _onChange?.Invoke();
     }
+
+    #endregion
 
     #region Listerners
 
+    /// <summary>
+    /// The onchange listeners will be notified when any change is made to the recordset that
+    /// require the UI to update.
+    /// </summary>
+    /// <param name="listener">Any action that will be invoked on change</param>
     public void AddOnChangeListeners(Action listener)
     {
         _onChange += listener;
     }
 
+    /// <summary>
+    /// Remove listeners set by the function AddOnChangeListeners
+    /// </summary>
+    /// <param name="listener">An Action that has been set to listen</param>
     public void RemoveOnChangeListeners(Action listener)
     {
         _onChange -= listener;
