@@ -69,10 +69,15 @@ public class EZRecordset<TModel> where TModel : new()
     /// </summary>
     public bool SaveChangesAutomatic { get; set; }
 
+    /// <summary>
+    /// If true then create a new record as soon as the last new record is changed.
+    /// </summary>
+    public bool AddNewRecordAutomatic { get; set; }
+
     #endregion
 
     #region Private Fields
-    private Action? _onChange;
+    private Action<object>? _onChange;
     private readonly Func<Task<EZActionResult<List<TModel>?>>>? _getAllRecords;
     private readonly Func<TModel, bool>? _where;
     private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _createRecord;
@@ -81,6 +86,7 @@ public class EZRecordset<TModel> where TModel : new()
     private readonly Func<TModel, Task<EZActionResult<bool>>>? _deleteRecord;
     private readonly List<EZRecord<TModel>> _changedRecords = new();
     private readonly List<EZRecord<TModel>> _invalidRecords = new();
+    private EZRecord<TModel>? _newRecord;
     #endregion
 
     #region Public Events
@@ -187,7 +193,7 @@ public class EZRecordset<TModel> where TModel : new()
         {
             HasFailedOperation = false;
             IsBusy = true;
-            _onChange?.Invoke();
+            _onChange?.Invoke(this);
             if (_getAllRecords != null) {
                 var result = await _getAllRecords();
                 if (result?.Content != null) 
@@ -210,13 +216,13 @@ public class EZRecordset<TModel> where TModel : new()
                 RefreshRecordSet();
             }
             IsBusy = false;
-            _onChange?.Invoke();
+            _onChange?.Invoke(this);
         }
         catch (Exception ex) {
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            _onChange?.Invoke();
+            _onChange?.Invoke(this);
         }
     }
 
@@ -227,6 +233,9 @@ public class EZRecordset<TModel> where TModel : new()
     private void RefreshRecordSet()
     {
         Records.Clear();
+        _changedRecords.Clear();
+        _invalidRecords.Clear();
+        _newRecord = null;
         if (_readRecord == null)
         {
             foreach (var item in Data)
@@ -255,7 +264,10 @@ public class EZRecordset<TModel> where TModel : new()
                                                           _deleteRecord, 
                                                           OnStateHasChanged));
                 }
-                AddNewRecord2(new TModel());
+                if (AddNewRecordAutomatic)
+                {
+                    AddNewRecord(new TModel());
+                }
             }
         }
         SelectedRecord = Records.FirstOrDefault();
@@ -279,11 +291,16 @@ public class EZRecordset<TModel> where TModel : new()
     /// <summary>
     /// This function adds a new record to the existing recordset. It will also trigger events.
     /// </summary>
-    public void AddNewRecord()
+    public bool TryAddNewRecord()
     {
-        AddNewRecord2(new TModel());
-        RecordsHaveChanged?.Invoke(this, new());
-        _onChange?.Invoke();
+        if (_newRecord == null)
+        {
+            AddNewRecord(new TModel());
+            RecordsHaveChanged?.Invoke(this, new());
+            _onChange?.Invoke(this);
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -291,18 +308,19 @@ public class EZRecordset<TModel> where TModel : new()
     /// No events will be triggered. 
     /// </summary>
     /// <param name="newModel">The model that will populate the list Data and is contained by the record</param>
-    private void AddNewRecord2(TModel newModel)
+    private void AddNewRecord(TModel newModel)
     {
         if (_createRecord != null && _readRecord != null && _updateRecord != null && _deleteRecord != null)
         {
             Data.Add(newModel);
-            Records.Add(new EZRecord<TModel>(newModel, 
-                                                  _createRecord, 
-                                                  _readRecord, 
-                                                  _updateRecord, 
-                                                  _deleteRecord, 
-                                                  OnStateHasChanged, 
-                                                  true));
+            _newRecord = new EZRecord<TModel>(newModel,
+                                                  _createRecord,
+                                                  _readRecord,
+                                                  _updateRecord,
+                                                  _deleteRecord,
+                                                  OnStateHasChanged,
+                                                  true);
+            Records.Add(_newRecord);
         }
     }
 
@@ -317,7 +335,7 @@ public class EZRecordset<TModel> where TModel : new()
         {
             Data.Remove(deletedRecord.Model);
             Records.Remove(deletedRecord);
-            _onChange?.Invoke();
+            _onChange?.Invoke(this);
         }
         else
         {
@@ -340,7 +358,11 @@ public class EZRecordset<TModel> where TModel : new()
         // Ischanged is not yet set to true, or the new record is being deleted.
         if (changedRecord.IsNewRecord && !changedRecord.IsChanged && !changedRecord.IsDeleted)
         {
-            AddNewRecord();
+            _newRecord = null;
+            if (AddNewRecordAutomatic)
+            {
+                TryAddNewRecord();
+            }
         }
         // If the flag IsDeleted is set to true the recordset must remove the record from its lists
         if (changedRecord.IsDeleted)
@@ -392,7 +414,7 @@ public class EZRecordset<TModel> where TModel : new()
                 _invalidRecords.Add(changedRecord);
             }
         }
-        _onChange?.Invoke();
+        _onChange?.Invoke(this);
     }
 
     #endregion
@@ -404,7 +426,7 @@ public class EZRecordset<TModel> where TModel : new()
     /// require the UI to update.
     /// </summary>
     /// <param name="listener">Any action that will be invoked on change</param>
-    public void AddOnChangeListeners(Action listener)
+    public void AddOnChangeListeners(Action<object> listener)
     {
         _onChange += listener;
     }
@@ -413,7 +435,7 @@ public class EZRecordset<TModel> where TModel : new()
     /// Remove listeners set by the function AddOnChangeListeners
     /// </summary>
     /// <param name="listener">An Action that has been set to listen</param>
-    public void RemoveOnChangeListeners(Action listener)
+    public void RemoveOnChangeListeners(Action<object> listener)
     {
         _onChange -= listener;
     }

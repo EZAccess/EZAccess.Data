@@ -12,6 +12,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     public bool IsDeleted { get; private set; }
     public bool IsNewRecord { get; private set; }
     public bool IsBusy { get; private set; }
+    public bool IsSaved { get; private set; }
     public bool HasFailedOperation { get; private set; }
     public string? ErrorMessage { get; private set; }
     public Dictionary<string, List<string>> ValidationErrors { get; private set; }
@@ -209,6 +210,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 {
                     IsChanged = false;
                     IsNewRecord = false;
+                    IsSaved = true;
                     OnAfterUpdate?.Invoke(this, Model);
                 }
                 StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
@@ -430,6 +432,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
             }
             IsChanged = true;
+            IsSaved = false;
             StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, true));
         }
         // If any changes are made on a field, all custom validation messagesd of this field need to be cleared
@@ -472,7 +475,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     #region Garbage Collection
     public void Dispose()
     {
-        var x = 1;
+        throw new NotImplementedException();
     }
     #endregion
 
