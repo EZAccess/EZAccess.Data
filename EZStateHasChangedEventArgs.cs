@@ -1,8 +1,8 @@
 ﻿namespace EZAccess.Data;
 
-public class EZRecordsetStateHasChangedEventArgs: EventArgs
+public class EZStateHasChangedEventArgs: EventArgs
 {
-    public EZRecordsetStateHasChangedEventArgs(object? record, bool trySaveRecords = false)
+    public EZStateHasChangedEventArgs(object? record, bool trySaveRecords = false)
     {
         Record = record;
         TrySaveRecords = trySaveRecords;

@@ -349,7 +349,7 @@ public class EZRecordset<TModel> where TModel : new()
     /// is changed.
     /// </summary>
     /// <param name="args">Eventargs that contain the record that has been changed.</param>
-    public void OnStateHasChanged(EZRecordsetStateHasChangedEventArgs args)
+    public void OnStateHasChanged(EZStateHasChangedEventArgs args)
     {
         if (args.Record == null) { return; }
         var changedRecord = (EZRecord<TModel>)args.Record;

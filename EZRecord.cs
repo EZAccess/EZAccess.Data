@@ -40,7 +40,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     #endregion
 
     #region Events
-    public event EventHandler<EZRecordsetStateHasChangedEventArgs>? StateHasChanged;
+    public event EventHandler<EZStateHasChangedEventArgs>? StateHasChanged;
     public event EventHandler<string>? OnCRUDError;
     public event EventHandler<TModel>? OnAfterRefresh;
     public event EventHandler<TModel>? OnAfterUndo;
@@ -80,7 +80,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// <param name="onParametersChanged">Action that is executed when any property of the record is changed</param>
     internal EZRecord(TModel data, 
                     Func<TModel, Task<EZActionResult<TModel?>>> readRecord,
-                    Action<EZRecordsetStateHasChangedEventArgs>? onStateHasChanged)
+                    Action<EZStateHasChangedEventArgs>? onStateHasChanged)
     {
         Model = data;
         IsReadOnly = true;
@@ -115,7 +115,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                     Func<TModel, Task<EZActionResult<TModel?>>> readRecord, 
                     Func<TModel, Task<EZActionResult<TModel?>>> updateRecord, 
                     Func<TModel, Task<EZActionResult<bool>>> deleteRecord,
-                    Action<EZRecordsetStateHasChangedEventArgs>? onStateHasChanged,
+                    Action<EZStateHasChangedEventArgs>? onStateHasChanged,
                     bool isNewRecord = false)
     {
         Model = data;
@@ -161,7 +161,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 HasFailedOperation = false;
                 IsBusy = true;
                 ValidationErrors = new();
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
                 BeforeCRUDEventArgs<TModel> args = new(Model);
                 OnBeforeUpdate?.Invoke(this, args);
                 if (IsNewRecord)
@@ -213,7 +213,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                     IsSaved = true;
                     OnAfterUpdate?.Invoke(this, Model);
                 }
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
             }
         }
         catch (Exception ex)
@@ -221,7 +221,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
         }
         if (HasFailedOperation)
         {
@@ -251,7 +251,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             {
                 HasFailedOperation = false;
                 IsBusy = true;
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
                 BeforeCRUDEventArgs<TModel> args = new(Model);
                 OnBeforeUndo?.Invoke(this, args);
                 if (!args.Cancel)
@@ -273,7 +273,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                     IsChanged = false;
                     OnAfterUndo?.Invoke(this, Model);
                 }
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
             }
         }
         catch (Exception ex)
@@ -281,7 +281,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
         }
         if (HasFailedOperation)
         {
@@ -311,7 +311,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 }
                 HasFailedOperation = false;
                 IsBusy = true;
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
                 if (_readRecord != null)
                 {
                     BeforeCRUDEventArgs<TModel> args = new(Model);
@@ -335,14 +335,14 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 {
                     OnAfterRefresh?.Invoke(this, Model);
                 }
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
             }
             catch (Exception ex)
             {
                 IsBusy = false;
                 HasFailedOperation = true;
                 ErrorMessage = ex.Message;
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
             }
             if (HasFailedOperation)
             {
@@ -366,7 +366,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         {
             HasFailedOperation = false;
             IsBusy = true;
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
             if (_deleteRecord != null)// && !IsNewRecord)
             {
                 BeforeCRUDEventArgs<TModel> args = new(Model);
@@ -397,14 +397,14 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             {
                 OnAfterDelete?.Invoke(this, Model);
             }
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
         }
         catch (Exception ex)
         {
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
         }
         if (HasFailedOperation)
         {
@@ -429,11 +429,11 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             {
                 // For a new record this event need to be triggered twice: 1 time to create a new record,
                 // 2 times to be added to changed records
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
             }
             IsChanged = true;
             IsSaved = false;
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, true));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, true));
         }
         // If any changes are made on a field, all custom validation messagesd of this field need to be cleared
         if (ValidationErrors.Any())
@@ -441,7 +441,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             if (ValidationErrors.ContainsKey(eventArgs.FieldIdentifier.FieldName))
             {
                 ValidationErrors.Remove(eventArgs.FieldIdentifier.FieldName);
-                StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, true));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, true));
             }
         }
 
@@ -466,7 +466,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         }
         if (stateChanged)
         {
-            StateHasChanged?.Invoke(this, new EZRecordsetStateHasChangedEventArgs((object)this, false));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, false));
         }
     }
 
