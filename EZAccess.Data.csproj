@@ -9,19 +9,15 @@
     <Copyright>2022 EZAccess.nl</Copyright>
     <Company>EZAccess.nl</Company>
     <Description>Library for creating a recordset to easy access data and perform CRUD operations via http or gRPC</Description>
-    <PackageProjectUrl>https://www.ezaccess.nl</PackageProjectUrl>
+    <PackageProjectUrl></PackageProjectUrl>
     <RepositoryUrl>https://github.com/EZAccess/EZAccess.Data</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Httpservice; Recordset; Data Access; Data helpers</PackageTags>
     <PackageReleaseNotes>Initial release with basic functionality for recordsets and http requests</PackageReleaseNotes>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.1</AssemblyVersion>
-    <FileVersion>1.0.0.1</FileVersion>
-    <PackageLicenseFile>C:\Users\gideo\OneDrive - EZ Access\Documenten\Projecten\EZ Access Shared\EZAccess.Data\LICENCE.txt</PackageLicenseFile>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.2</AssemblyVersion>
+    <FileVersion>1.0.1.2</FileVersion>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Forms" Version="6.0.5" />
-  </ItemGroup>
 
 </Project>

@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.Forms;
-
-namespace EZAccess.Data;
+﻿namespace EZAccess.Data;
 
 public class EZRecord<TModel> : IDisposable where TModel : new()
 {
@@ -421,7 +419,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// </summary>
     /// <param name="sender">The object that triggers the event</param>
     /// <param name="eventArgs">The arguments send with the event by the EditContext object</param>
-    public void OnFieldChanged(object? sender, FieldChangedEventArgs eventArgs)
+    public void OnFieldChanged(string fieldName)
     {
         if (!IsChanged)
         {
@@ -438,9 +436,9 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         // If any changes are made on a field, all custom validation messagesd of this field need to be cleared
         if (ValidationErrors.Any())
         {
-            if (ValidationErrors.ContainsKey(eventArgs.FieldIdentifier.FieldName))
+            if (ValidationErrors.ContainsKey(fieldName))
             {
-                ValidationErrors.Remove(eventArgs.FieldIdentifier.FieldName);
+                ValidationErrors.Remove(fieldName);
                 StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, true));
             }
         }
@@ -473,10 +471,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     #endregion
 
     #region Garbage Collection
-    public void Dispose()
-    {
-        throw new NotImplementedException();
-    }
+    public void Dispose() => throw new NotImplementedException();
     #endregion
 
 }
