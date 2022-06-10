@@ -1,8 +1,6 @@
-﻿using System.Net;
+﻿namespace EZAccess.Data;
 
-namespace EZAccess.Data;
-
-public class EZRecordset<TModel> where TModel : new()
+public class EZRecordset<TModel> : IDisposable where TModel : new()
 {
     #region Public Readonly Properties
 
@@ -19,7 +17,7 @@ public class EZRecordset<TModel> where TModel : new()
     /// <summary>
     /// Return a single record that is currently selected
     /// </summary>
-    public EZRecord<TModel>? SelectedRecord { get; private set; }
+    public EZRecord<TModel>? CurrentRecord { get; private set; }
 
     /// <summary>
     /// Busy during execution of async actions
@@ -37,10 +35,56 @@ public class EZRecordset<TModel> where TModel : new()
     public bool HasFailedOperation { get; private set; }
 
     /// <summary>
-    /// Informs whether the recordset has CRUD functions (Is not readonly) or
-    /// whether it has not (Is readonly).
+    /// Allow refresh if the configuration contains a function to refresh.
+    /// This function is simular to read, but read applies to a single record, 
+    /// while refresh applies to the recordset.
     /// </summary>
-    public bool IsReadOnly { get; private set; }
+    public bool AllowRefresh {
+        get
+        {
+            return _configuration.GetAllRecords is not null || _configuration.GetRecordsWhere is not null;
+        }
+    }
+
+    /// <summary>
+    /// Allow create if the configuration contains a function to create a new record.
+    /// </summary>
+    public bool AllowCreate { 
+        get { 
+            return _configuration.CreateRecord is not null; 
+        } 
+    }
+
+    /// <summary>
+    /// Allow read if the configuration contains a function to read a record.
+    /// This function is simular to refresh, but applies to a single record.
+    /// </summary>
+    public bool AllowRead {
+        get
+        {
+            return _configuration.ReadRecord is not null;
+        }
+    }
+
+    /// <summary>
+    /// Allow update if the configuration contains a function to update a record.
+    /// </summary>
+    public bool AllowUpdate {
+        get
+        {
+            return _configuration.UpdateRecord is not null;
+        }
+    }
+
+    /// <summary>
+    /// Allow delete if the configuration contains a function to delete a record.
+    /// </summary>
+    public bool AllowDelete { 
+        get
+        {
+            return _configuration.DeleteRecord is not null;
+        }
+    }
 
     /// <summary>
     /// returns the number of records which are changed and not saved.
@@ -58,6 +102,17 @@ public class EZRecordset<TModel> where TModel : new()
         get { return _invalidRecords.Count; }
     }
 
+    public int CurrentIndex { 
+        get {
+            if (CurrentRecord == null) {
+                return 0;
+            }
+            else {
+                return Records.IndexOf(CurrentRecord) + 1;
+            }
+        } 
+    }
+
 
     #endregion
 
@@ -67,7 +122,14 @@ public class EZRecordset<TModel> where TModel : new()
     /// If true then try to save changed records at certain events. If false then
     /// only save changes by explicit commands.
     /// </summary>
-    public bool SaveChangesAutomatic { get; set; }
+    public bool SaveChangesAutomatic { 
+        get {
+            return _configuration.SaveChangesAutomatic;
+        }
+        set { 
+            _configuration.SaveChangesAutomatic = value;
+        }
+    }
 
     /// <summary>
     /// If true then create a new record as soon as the last new record is changed.
@@ -78,15 +140,10 @@ public class EZRecordset<TModel> where TModel : new()
 
     #region Private Fields
     private Action<object>? _onChange;
-    private readonly Func<Task<EZActionResult<List<TModel>?>>>? _getAllRecords;
-    private readonly Func<TModel, bool>? _where;
-    private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _createRecord;
-    private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _readRecord;
-    private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _updateRecord;
-    private readonly Func<TModel, Task<EZActionResult<bool>>>? _deleteRecord;
     private readonly List<EZRecord<TModel>> _changedRecords = new();
     private readonly List<EZRecord<TModel>> _invalidRecords = new();
     private EZRecord<TModel>? _newRecord;
+    private readonly EZRecordsetConfiguration<TModel> _configuration;
     #endregion
 
     #region Public Events
@@ -103,68 +160,36 @@ public class EZRecordset<TModel> where TModel : new()
     {
         Data = data;
         Records = new List<EZRecord<TModel>>();
-        SelectedRecord = Records.FirstOrDefault();
+        CurrentRecord = Records.FirstOrDefault();
         RefreshRecordSet();
-        IsReadOnly = true;
+        _configuration = new EZRecordsetConfiguration<TModel>();
     }
 
     /// <summary>
-    /// Initialize the recordset with a function to read the recordset. 
+    /// Initialize the recordset with functions to perform CRUD operations
     /// </summary>
-    /// <param name="getAllRecords">Function which is called when all records need load/refresh</param>
-    public EZRecordset(Func<Task<EZActionResult<List<TModel>?>>> getAllRecords,
-                       Func<TModel, bool>? where)
+    /// <param name="configuration">Configuration object contains configuration info for the Recordset</param>
+    /// <exception cref="InvalidOperationException"></exception>
+    public EZRecordset(EZRecordsetConfiguration<TModel> configuration)
     {
         Data = new List<TModel>();
         Records = new List<EZRecord<TModel>>();
-        _getAllRecords += getAllRecords;
-        _where = where;
-        IsReadOnly = true;
-    }
-
-    /// <summary>
-    /// Initialize the recordset with the functions that allow reading all records and single records. 
-    /// </summary>
-    /// <param name="getAllRecords">Function which is called when all records need load/refresh</param>
-    /// <param name="readRecord">Function which is called by a single record to refresh itself</param>
-    public EZRecordset(Func<Task<EZActionResult<List<TModel>?>>> getAllRecords,
-                       Func<TModel, bool>? where,
-                       Func<TModel, Task<EZActionResult<TModel?>>> readRecord)
-    {
-        Data = new List<TModel>();
-        Records = new List<EZRecord<TModel>>();
-        _getAllRecords += getAllRecords;
-        _where = where;
-        _readRecord += readRecord;
-        IsReadOnly = true;
-    }
-
-    /// <summary>
-    /// Initialize the recordset with the functions that allow CRUD operations on the record en recordset. 
-    /// </summary>
-    /// <param name="getAllRecords">Function which is called when all records need load/refresh</param>
-    /// <param name="createRecord">Function which is called when a new record is saved</param>
-    /// <param name="readRecord">Function which is called by a single record to refresh itself</param>
-    /// <param name="updateRecord">Function which is called when an existing record is saved</param>
-    /// <param name="deleteRecord">Function which is called when a record is deleted</param>
-    public EZRecordset(Func<Task<EZActionResult<List<TModel>?>>> getAllRecords,
-                       Func<TModel, bool>? where,
-                       Func<TModel, Task<EZActionResult<TModel?>>> createRecord,
-                       Func<TModel, Task<EZActionResult<TModel?>>> readRecord,
-                       Func<TModel, Task<EZActionResult<TModel?>>> updateRecord,
-                       Func<TModel, Task<EZActionResult<bool>>> deleteRecord,
-                       bool saveChangesAutomatic = true)
-    {
-        Data = new List<TModel>();
-        Records = new List<EZRecord<TModel>>();
-        _getAllRecords += getAllRecords;
-        _where = where;
-        _createRecord += createRecord;
-        _readRecord += readRecord;
-        _updateRecord += updateRecord;
-        _deleteRecord += deleteRecord;
-        IsReadOnly = false;
-        SaveChangesAutomatic = saveChangesAutomatic;
+        _configuration = configuration;
+        if (_configuration.GetAllRecords is null && _configuration.GetRecordsWhere is null)
+        {
+            throw new InvalidOperationException("The EZRecordset configuration requires either " +
+                "a GetAllRecords or an GetRecordsWhere function!");
+        }
+        if (_configuration.CreateRecord is not null && _configuration.UpdateRecord is null)
+        {
+            throw new InvalidOperationException("The EZRecordset configuration requires " +
+                "an UpdateRecord function if a CreateRecord function is provided!");
+        }
+        if (_configuration.UpdateRecord is not null && _configuration.ReadRecord is null)
+        {
+            throw new InvalidOperationException("The EZRecordset configuration requires " +
+                "a ReadRecord function if an UpdateRecord function is provided!");
+        }
     }
 
     #endregion
@@ -194,14 +219,14 @@ public class EZRecordset<TModel> where TModel : new()
             HasFailedOperation = false;
             IsBusy = true;
             _onChange?.Invoke(this);
-            if (_getAllRecords != null) {
-                var result = await _getAllRecords();
+            if (_configuration.GetAllRecords != null) {
+                var result = await _configuration.GetAllRecords();
                 if (result?.Content != null) 
                 {
-                    if (_where != null)
+                    if (_configuration.WhereFunc != null)
                     {
                         var content = result.Content;
-                        Data = content.Where(_where).ToList();
+                        Data = content.Where(_configuration.WhereFunc).ToList();
                     }
                     else
                     {
@@ -236,41 +261,15 @@ public class EZRecordset<TModel> where TModel : new()
         _changedRecords.Clear();
         _invalidRecords.Clear();
         _newRecord = null;
-        if (_readRecord == null)
+        foreach (var item in Data)
         {
-            foreach (var item in Data)
-            {
-                Records.Add(new EZRecord<TModel>(item));
-            }
+            Records.Add(new EZRecord<TModel>(this, item, _configuration, OnStateHasChanged));
         }
-        else
+        if (AddNewRecordAutomatic && AllowCreate)
         {
-            // If (IsReadOnly) could be used, but the compiler likes this better.
-            if (_createRecord == null || _updateRecord == null || _deleteRecord == null)
-            {
-                foreach (var item in Data)
-                {
-                    Records.Add(new EZRecord<TModel>(item, _readRecord, OnStateHasChanged));
-                }
-            }
-            else
-            {
-                foreach (var item in Data)
-                {
-                    Records.Add(new EZRecord<TModel>(item, 
-                                                          _createRecord, 
-                                                          _readRecord, 
-                                                          _updateRecord, 
-                                                          _deleteRecord, 
-                                                          OnStateHasChanged));
-                }
-                if (AddNewRecordAutomatic)
-                {
-                    AddNewRecord(new TModel());
-                }
-            }
+            AddNewRecord(new TModel());
         }
-        SelectedRecord = Records.FirstOrDefault();
+        CurrentRecord = Records.FirstOrDefault();
 
     }
 
@@ -295,7 +294,7 @@ public class EZRecordset<TModel> where TModel : new()
     {
         if (_newRecord == null)
         {
-            AddNewRecord(new TModel());
+            var newRecord = AddNewRecord(new TModel());
             RecordsHaveChanged?.Invoke(this, new());
             _onChange?.Invoke(this);
             return true;
@@ -308,20 +307,22 @@ public class EZRecordset<TModel> where TModel : new()
     /// No events will be triggered. 
     /// </summary>
     /// <param name="newModel">The model that will populate the list Data and is contained by the record</param>
-    private void AddNewRecord(TModel newModel)
+    private EZRecord<TModel>? AddNewRecord(TModel newModel)
     {
-        if (_createRecord != null && _readRecord != null && _updateRecord != null && _deleteRecord != null)
+        if (_configuration.CreateRecord != null && 
+            _configuration.ReadRecord != null && 
+            _configuration.UpdateRecord != null && 
+            _configuration.DeleteRecord != null)
         {
             Data.Add(newModel);
-            _newRecord = new EZRecord<TModel>(newModel,
-                                                  _createRecord,
-                                                  _readRecord,
-                                                  _updateRecord,
-                                                  _deleteRecord,
+            _newRecord = new EZRecord<TModel>(this, newModel,
+                                                  _configuration,
                                                   OnStateHasChanged,
                                                   true);
             Records.Add(_newRecord);
+            return _newRecord;
         }
+        return null;
     }
 
     /// <summary>
@@ -344,6 +345,59 @@ public class EZRecordset<TModel> where TModel : new()
         }
     }
 
+    #endregion
+
+    #region Navigation Functions
+
+    public void SelectFirst()
+    {
+        CurrentRecord = Records.FirstOrDefault();
+        CurrentRecord?.SetFocus(true);
+    }
+
+    public void SelectPrevious()
+    {
+        if (CurrentIndex > 1)
+        {
+            CurrentRecord = Records.ElementAt(CurrentIndex - 2);
+            CurrentRecord?.SetFocus(true);
+        }
+    }
+
+    public void SelectNext()
+    {
+        if (CurrentIndex < Records.Count)
+        {
+            CurrentRecord = Records.ElementAt(CurrentIndex);
+            CurrentRecord?.SetFocus(true);
+        }
+    }
+
+    public void SelectLast()
+    {
+        CurrentRecord = Records.LastOrDefault();
+        CurrentRecord?.SetFocus(true);
+    }
+
+    public void GoToRecord(int index)
+    {
+        if (Records.Count >= index && index >= 1)
+        {
+            CurrentRecord = Records.ElementAt(index - 1);
+            CurrentRecord?.SetFocus(true);
+        }
+    }
+
+    public void FocusOrAddNewRecord()
+    {
+        TryAddNewRecord();
+        _newRecord?.SetFocus(true);
+    }
+
+    #endregion
+
+    #region EventListeners
+
     /// <summary>
     /// This is an event listener that routes the different action when any of the member records 
     /// is changed.
@@ -356,7 +410,7 @@ public class EZRecordset<TModel> where TModel : new()
 
         // if any change is made to a new record create a new 'new' record. Only do this if the flag
         // Ischanged is not yet set to true, or the new record is being deleted.
-        if (changedRecord.IsNewRecord && !changedRecord.IsChanged && !changedRecord.IsDeleted)
+        if (changedRecord.IsNewRecord && !changedRecord.IsChanged && !changedRecord.IsDeleted && !args.SetFocus)
         {
             _newRecord = null;
             if (AddNewRecordAutomatic)
@@ -371,7 +425,7 @@ public class EZRecordset<TModel> where TModel : new()
         }
         // The record will notify that changes to other records may be made. This is only
         // executed if the setting SaveChangesAutomatic in the recordset is set to true.
-        if (args.TrySaveRecords && SaveChangesAutomatic)
+        if (args.SaveRecords && SaveChangesAutomatic)
         {
             foreach (var record in _changedRecords)
             {
@@ -400,6 +454,10 @@ public class EZRecordset<TModel> where TModel : new()
             }
         }
 
+        // Check if the changed record is already member of the collection invalid records,
+        // and check whether it should be added or removed.
+        // The collection invalid records is recorded to know which records require to be saved
+        // but cannot be saved.
         if (_invalidRecords.Contains(changedRecord))
         {
             if (!changedRecord.HasValidationErrors)
@@ -414,6 +472,18 @@ public class EZRecordset<TModel> where TModel : new()
                 _invalidRecords.Add(changedRecord);
             }
         }
+
+        if (!args.SetFocus && CurrentRecord != changedRecord && !args.NoFocus)
+        {
+            CurrentRecord = changedRecord;
+            CurrentRecord?.SetFocus(true);
+        }
+
+        if (args.SetFocus)
+        {
+            CurrentRecord = changedRecord;
+        }
+
         _onChange?.Invoke(this);
     }
 
@@ -440,7 +510,11 @@ public class EZRecordset<TModel> where TModel : new()
         _onChange -= listener;
     }
 
-
     #endregion
+
+    public void Dispose()
+    {
+        throw new NotImplementedException();
+    }
 
 }

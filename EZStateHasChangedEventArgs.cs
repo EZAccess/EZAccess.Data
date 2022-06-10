@@ -2,12 +2,13 @@
 
 public class EZStateHasChangedEventArgs: EventArgs
 {
-    public EZStateHasChangedEventArgs(object? record, bool trySaveRecords = false)
+    public EZStateHasChangedEventArgs(object? record)
     {
         Record = record;
-        TrySaveRecords = trySaveRecords;
     }
 
-    public object? Record { get; }
-    public bool TrySaveRecords { get; }
+    public object? Record { get; init; }
+    public bool SaveRecords { get; init; }
+    public bool SetFocus { get; init; }
+    public bool NoFocus { get; init; }
 }

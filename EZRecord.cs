@@ -4,8 +4,8 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
 {
     #region Public Properties
     public TModel Model { get; private set; }
-    public List<EZField> Fields { get; }
-    public bool IsReadOnly { get; private set; }
+    //public List<EZField> Fields { get; }
+    //public bool IsReadOnly { get; private set; }
     public bool IsChanged { get; private set; }
     public bool IsDeleted { get; private set; }
     public bool IsNewRecord { get; private set; }
@@ -27,14 +27,63 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             }
         }
     }
+    public bool HasFocus
+    {
+        get {
+            return _parent.CurrentRecord == this;
+        }
+    }
+
+    /// <summary>
+    /// Allow create if the configuration contains a function to create a new record.
+    /// </summary>
+    public bool AllowCreate
+    {
+        get
+        {
+            return _configuration.CreateRecord is not null;
+        }
+    }
+
+    /// <summary>
+    /// Allow read if the configuration contains a function to read a record.
+    /// This function is simular to refresh, but applies to a single record.
+    /// </summary>
+    public bool AllowRead
+    {
+        get
+        {
+            return _configuration.ReadRecord is not null;
+        }
+    }
+
+    /// <summary>
+    /// Allow update if the configuration contains a function to update a record.
+    /// </summary>
+    public bool AllowUpdate
+    {
+        get
+        {
+            return _configuration.UpdateRecord is not null;
+        }
+    }
+
+    /// <summary>
+    /// Allow delete if the configuration contains a function to delete a record.
+    /// </summary>
+    public bool AllowDelete
+    {
+        get
+        {
+            return _configuration.DeleteRecord is not null;
+        }
+    }
 
     #endregion
 
     #region Private Fields
-    private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _createRecord;
-    private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _readRecord;
-    private readonly Func<TModel, Task<EZActionResult<TModel?>>>? _updateRecord;
-    private readonly Func<TModel, Task<EZActionResult<bool>>>? _deleteRecord;
+    private readonly EZRecordsetConfiguration<TModel> _configuration;
+    private readonly EZRecordset<TModel> _parent;
     #endregion
 
     #region Events
@@ -48,6 +97,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     public event EventHandler<BeforeCRUDEventArgs<TModel>>? OnBeforeUndo;
     public event EventHandler<BeforeCRUDEventArgs<TModel>>? OnBeforeUpdate;
     public event EventHandler<BeforeCRUDEventArgs<TModel>>? OnBeforeDelete;
+    public event EventHandler<bool>? OnFocus;
     #endregion
 
     #region Class Constructors
@@ -55,87 +105,41 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     /// <summary>
     /// Initialize the record with raw data only. No CRUD operations are available
     /// </summary>
-    /// <param name="data">Data of TModel that contain the raw data of the record</param>
-    internal EZRecord(TModel data)
+    /// <param name="parent">The recordset that holds the list of records</param>
+    /// <param name="model">Data of TModel that contain the raw data of the record</param>
+    internal EZRecord(EZRecordset<TModel> parent, TModel model)
     {
-        Model = data;
-        IsReadOnly = true;
-        Fields = new();
+        _parent = parent;
+        _configuration = new();
+        Model = model;
         ValidationErrors = new();
-        Type type = typeof(TModel);
-
-        foreach (var item in type.GetProperties())
-        {
-            Fields.Add(new EZField(type, item));
-        }
     }
 
     /// <summary>
-    /// Initialize the record with raw data and a deligate to refresh the record. No CRUD operations are available
+    /// Initializes the record and configures it with the configuration object
     /// </summary>
-    /// <param name="data">Data of TModel that contain the raw data of the record</param>
-    /// <param name="readRecord">Delegate to execute when e refresh is required</param>
-    /// <param name="onParametersChanged">Action that is executed when any property of the record is changed</param>
-    internal EZRecord(TModel data, 
-                    Func<TModel, Task<EZActionResult<TModel?>>> readRecord,
-                    Action<EZStateHasChangedEventArgs>? onStateHasChanged)
+    /// <param name="parent">The recordset that holds the list of records</param>
+    /// <param name="model">The model that contains the data</param>
+    /// <param name="configuration">The object containing configuration for the CRUD operations</param>
+    /// <param name="onStateHasChanged">Listener to changes</param>
+    /// <param name="isNewRecord">If the record is a new record insert True</param>
+    internal EZRecord(EZRecordset<TModel> parent, 
+                      TModel model, 
+                      EZRecordsetConfiguration<TModel> configuration,
+                      Action<EZStateHasChangedEventArgs>? onStateHasChanged,
+                      bool isNewRecord = false)
     {
-        Model = data;
-        IsReadOnly = true;
-        Fields = new();
+        _parent = parent;
+        _configuration = configuration;
+        Model = model;
         ValidationErrors = new();
-        Type type = typeof(TModel);
-
-        foreach (var item in type.GetProperties())
-        {
-            Fields.Add(new EZField(type, item));
-        }
-        _readRecord = readRecord;
-//        _onStateHasChanged = onStateHasChanged;
-        if (onStateHasChanged != null)
-        {
-            StateHasChanged = (s, e) => onStateHasChanged(e);
-        }
-    }
-
-    /// <summary>
-    /// Initialize the record with raw data and a deligates to do CRUD operations
-    /// </summary>
-    /// <param name="data">Data of TModel that contain the raw data of the record</param>
-    /// <param name="createRecord">Delegate to execute when a new record is saved</param>
-    /// <param name="readRecord">Delegate to execute when a refresh is required</param>
-    /// <param name="updateRecord">Delegate to execute when an existing record is saved</param>
-    /// <param name="deleteRecord">Delegate to execute when a record is deleted</param>
-    /// <param name="onStateHasChanged">Action that is executed when the Data of the record is changed</param>
-    /// <param name="isNewRecord">Record will be treated as new record</param>
-    internal EZRecord(TModel data, 
-                    Func<TModel, Task<EZActionResult<TModel?>>> createRecord, 
-                    Func<TModel, Task<EZActionResult<TModel?>>> readRecord, 
-                    Func<TModel, Task<EZActionResult<TModel?>>> updateRecord, 
-                    Func<TModel, Task<EZActionResult<bool>>> deleteRecord,
-                    Action<EZStateHasChangedEventArgs>? onStateHasChanged,
-                    bool isNewRecord = false)
-    {
-        Model = data;
-        IsReadOnly = false;
-        Fields = new();
-        ValidationErrors = new();
-        Type type = typeof(TModel);
-
-        foreach (var item in type.GetProperties())
-        {
-            Fields.Add(new EZField(type, item));
-        }
-        _createRecord = createRecord;
-        _readRecord = readRecord;
-        _updateRecord = updateRecord;
-        _deleteRecord = deleteRecord;
         if (onStateHasChanged != null)
         {
             StateHasChanged = (s, e) => onStateHasChanged(e);
         }
         IsNewRecord = isNewRecord;
     }
+
     #endregion
 
     #region CRUD Operations
@@ -146,20 +150,19 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     public void SaveChanges()
     {
         Task.Run(SaveChangesAsync);
-        //SaveChangesAsync(displayErrors).Start();
     }
 
     public async Task SaveChangesAsync()
     {
-        if (IsBusy || IsReadOnly) { return; }
+        if (IsBusy || !AllowUpdate || !AllowCreate) { return; }
         try
         {
-            if (_updateRecord != null && _createRecord != null && IsChanged)
+            if (_configuration.UpdateRecord != null && _configuration.CreateRecord != null && IsChanged)
             {
                 HasFailedOperation = false;
                 IsBusy = true;
                 ValidationErrors = new();
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
                 BeforeCRUDEventArgs<TModel> args = new(Model);
                 OnBeforeUpdate?.Invoke(this, args);
                 if (IsNewRecord)
@@ -167,7 +170,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
 //                    BeforeCreate?.Invoke(this, args);
                     if (!args.Cancel)
                     {
-                        var result = await _createRecord(Model);
+                        var result = await _configuration.CreateRecord(Model);
                         if (result.IsSuccess && result.Content != null)
                         {
                             Model = result.Content;
@@ -187,7 +190,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 {
                     if (!args.Cancel)
                     {
-                        var result = await _updateRecord(Model);
+                        var result = await _configuration.UpdateRecord(Model);
                         if (result.IsSuccess && result.Content != null)
                         {
                             Model = result.Content;
@@ -211,7 +214,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                     IsSaved = true;
                     OnAfterUpdate?.Invoke(this, Model);
                 }
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
             }
         }
         catch (Exception ex)
@@ -219,7 +222,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
         }
         if (HasFailedOperation)
         {
@@ -237,7 +240,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
 
     public async Task UndoChangesAsync()
     {
-        if (IsBusy || IsReadOnly) { return; }
+        if (IsBusy || !AllowRead) { return; }
         try
         {
             if (IsNewRecord)
@@ -245,16 +248,16 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 await DeleteAsync();
                 return;
             }
-            if (_readRecord != null && IsChanged)
+            if (_configuration.ReadRecord != null && IsChanged)
             {
                 HasFailedOperation = false;
                 IsBusy = true;
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
                 BeforeCRUDEventArgs<TModel> args = new(Model);
                 OnBeforeUndo?.Invoke(this, args);
                 if (!args.Cancel)
                 {
-                    var result = await _readRecord(Model);
+                    var result = await _configuration.ReadRecord(Model);
                     if (result.IsSuccess && result.Content != null)
                     {
                         Model = result.Content;
@@ -271,7 +274,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                     IsChanged = false;
                     OnAfterUndo?.Invoke(this, Model);
                 }
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
             }
         }
         catch (Exception ex)
@@ -279,7 +282,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
         }
         if (HasFailedOperation)
         {
@@ -309,14 +312,14 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 }
                 HasFailedOperation = false;
                 IsBusy = true;
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
-                if (_readRecord != null)
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
+                if (_configuration.ReadRecord != null)
                 {
                     BeforeCRUDEventArgs<TModel> args = new(Model);
                     OnBeforeRefresh?.Invoke(this, args);
                     if (!args.Cancel)
                     {
-                        var result = await _readRecord(Model);
+                        var result = await _configuration.ReadRecord(Model);
                         if (result.IsSuccess && result.Content != null)
                         {
                             Model = result.Content;
@@ -332,15 +335,16 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 if (!HasFailedOperation)
                 {
                     OnAfterRefresh?.Invoke(this, Model);
+                    IsSaved = false;
                 }
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
             }
             catch (Exception ex)
             {
                 IsBusy = false;
                 HasFailedOperation = true;
                 ErrorMessage = ex.Message;
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
             }
             if (HasFailedOperation)
             {
@@ -359,13 +363,13 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
 
     public async Task DeleteAsync()
     {
-        if (IsBusy || IsReadOnly || IsDeleted) { return; }
+        if (IsBusy || !AllowDelete || IsDeleted) { return; }
         try
         {
             HasFailedOperation = false;
             IsBusy = true;
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
-            if (_deleteRecord != null)// && !IsNewRecord)
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
+            if (_configuration.DeleteRecord != null)// && !IsNewRecord)
             {
                 BeforeCRUDEventArgs<TModel> args = new(Model);
                 OnBeforeDelete?.Invoke(this, args);
@@ -377,7 +381,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                     }
                     else
                     {
-                        var result = await _deleteRecord(Model);
+                        var result = await _configuration.DeleteRecord(Model);
                         if (result.IsSuccess)
                         {
                             IsDeleted = true;
@@ -395,19 +399,29 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             {
                 OnAfterDelete?.Invoke(this, Model);
             }
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
         }
         catch (Exception ex)
         {
             IsBusy = false;
             HasFailedOperation = true;
             ErrorMessage = ex.Message;
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
         }
         if (HasFailedOperation)
         {
             OnCRUDError?.Invoke(this, $"Delete was not successful: {ErrorMessage}");
         }
+    }
+
+    #endregion
+
+    #region Other Operations
+
+    public void SetFocus(bool byProgram)
+    {
+        OnFocus?.Invoke(this, byProgram);
+        StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { SetFocus = true, SaveRecords = true });
     }
 
     #endregion
@@ -427,11 +441,11 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             {
                 // For a new record this event need to be triggered twice: 1 time to create a new record,
                 // 2 times to be added to changed records
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this));
             }
             IsChanged = true;
             IsSaved = false;
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, true));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { SaveRecords = true });
         }
         // If any changes are made on a field, all custom validation messagesd of this field need to be cleared
         if (ValidationErrors.Any())
@@ -439,7 +453,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             if (ValidationErrors.ContainsKey(fieldName))
             {
                 ValidationErrors.Remove(fieldName);
-                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, true));
+                StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { SaveRecords = true });
             }
         }
 
@@ -464,14 +478,17 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         }
         if (stateChanged)
         {
-            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs((object)this, false));
+            StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
         }
     }
 
     #endregion
 
     #region Garbage Collection
-    public void Dispose() => throw new NotImplementedException();
+    public void Dispose()
+    {
+        throw new NotImplementedException();
+    }
     #endregion
 
 }
