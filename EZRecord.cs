@@ -3,17 +3,65 @@
 public class EZRecord<TModel> : IDisposable where TModel : new()
 {
     #region Public Properties
+
+    /// <summary>
+    /// The Model is the class containing the data for the record.
+    /// </summary>
     public TModel Model { get; private set; }
-    //public List<EZField> Fields { get; }
-    //public bool IsReadOnly { get; private set; }
+
+    /// <summary>
+    /// Returns true if any data is changed in the Model which is not yet saved.
+    /// </summary>
     public bool IsChanged { get; private set; }
+
+    /// <summary>
+    /// This is a temporary status when the record is deleted by the user, but it still
+    /// requires actions to be completed by the program.
+    /// </summary>
     public bool IsDeleted { get; private set; }
+
+    /// <summary>
+    /// Returns a boolean whether the record is new or not. Any changes made to a new record
+    /// are ended with the Create action while changes made to a record which is not new
+    /// are ended with the Update action.
+    /// </summary>
     public bool IsNewRecord { get; private set; }
+
+    /// <summary>
+    /// Ruturns a boolean telling the UI whether the record is in the process of executing
+    /// an action. Particularly CRUD actions.
+    /// </summary>
     public bool IsBusy { get; private set; }
+
+    /// <summary>
+    /// Returns a boolean informing the UI changes made to the record are being saved.
+    /// This value is changed to false if either new changes are made to the record, or 
+    /// when the user refreses the data.
+    /// </summary>
     public bool IsSaved { get; private set; }
+
+    /// <summary>
+    /// Returns a boolean informing the UI the requested action has failed. In particularly
+    /// CRUD actions.
+    /// </summary>
     public bool HasFailedOperation { get; private set; }
+
+    /// <summary>
+    /// When any error has occured this field should represent a meaningfull message for
+    /// the UI.
+    /// </summary>
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>
+    /// When a record does not pass validation either on the client side or the server side
+    /// This dictionary should hold the validation messages.
+    /// </summary>
     public Dictionary<string, List<string>> ValidationErrors { get; private set; }
+
+    /// <summary>
+    /// Returns a boolean informing the UI validation has not passed. Details should be
+    /// read from the ValidationErrors property.
+    /// </summary>
     public bool HasValidationErrors
     {
         get { 
@@ -27,6 +75,10 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             }
         }
     }
+
+    /// <summary>
+    /// Returns a boolean value informing the UI whether this record should have focus.
+    /// </summary>
     public bool HasFocus
     {
         get {
@@ -34,6 +86,10 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         }
     }
 
+    /// <summary>
+    /// Returns a boolean informing the UI the record has been requested to be deleted.
+    /// To complete the process the DeleteRecord(Async) functions need to be called.
+    /// </summary>
     public bool DeleteRequested { get; private set; }
 
     /// <summary>
@@ -363,10 +419,6 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         Task.Run(DeleteAsync);
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
     public async Task DeleteAsync()
     {
         if (IsBusy || !AllowDelete || IsDeleted) { return; }
@@ -431,12 +483,14 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
     }
 
+    /// <summary>
+    /// Reset the property DeleteRequested to false.
+    /// </summary>
     public void CancelDelete()
     {
         DeleteRequested = false;
         StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
     }
-
 
     #endregion
 

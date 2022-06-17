@@ -360,6 +360,20 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     {
         if (Records.Contains(deletedRecord))
         {
+            if (deletedRecord.GetHashCode() == CurrentRecord?.GetHashCode())
+            {
+                CurrentRecord = null;
+                var index = Records.IndexOf(deletedRecord) + 1;
+                if (index >= Records.Count && index > 1)
+                {
+                    GoToRecord(index - 1);
+                }
+                if (index < Records.Count)
+                {
+                    GoToRecord(index + 1);
+                }
+            }
+
             Data.Remove(deletedRecord.Model);
             Records.Remove(deletedRecord);
             _onChange?.Invoke(this);
@@ -375,12 +389,20 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
 
     #region Navigation Functions
 
+    /// <summary>
+    /// Change the current record to be the first one in the list and change to focus
+    /// to it.
+    /// </summary>
     public void SelectFirst()
     {
         CurrentRecord = Records.FirstOrDefault();
         CurrentRecord?.SetFocus(true);
     }
 
+    /// <summary>
+    /// Change the current record to be the previous one in the list and change to focus
+    /// to it.
+    /// </summary>
     public void SelectPrevious()
     {
         if (CurrentIndex > 1)
@@ -390,6 +412,10 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
         }
     }
 
+    /// <summary>
+    /// Change the current record to be the next one in the list and change to focus
+    /// to it.
+    /// </summary>
     public void SelectNext()
     {
         if (CurrentIndex < Records.Count)
@@ -399,12 +425,21 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
         }
     }
 
+    /// <summary>
+    /// Change the current record to be the last one in the list and change to focus
+    /// to it.
+    /// </summary>
     public void SelectLast()
     {
         CurrentRecord = Records.LastOrDefault();
         CurrentRecord?.SetFocus(true);
     }
 
+    /// <summary>
+    /// Select the record to be selected. The focus is moved to the selected record.
+    /// The index ranges from 1 to N.
+    /// </summary>
+    /// <param name="index">Index starting with 1 from record to be selected</param>
     public void GoToRecord(int index)
     {
         if (Records.Count >= index && index >= 1)
@@ -414,6 +449,10 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
         }
     }
 
+    /// <summary>
+    /// This method will either set the focus to a new record, or create a new record and
+    /// set the focus to it.
+    /// </summary>
     public void FocusOrAddNewRecord()
     {
         TryAddNewRecord();
