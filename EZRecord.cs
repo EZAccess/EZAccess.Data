@@ -34,6 +34,8 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         }
     }
 
+    public bool DeleteRequested { get; private set; }
+
     /// <summary>
     /// Allow create if the configuration contains a function to create a new record.
     /// </summary>
@@ -361,6 +363,10 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
         Task.Run(DeleteAsync);
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
     public async Task DeleteAsync()
     {
         if (IsBusy || !AllowDelete || IsDeleted) { return; }
@@ -413,6 +419,24 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
             OnCRUDError?.Invoke(this, $"Delete was not successful: {ErrorMessage}");
         }
     }
+
+    /// <summary>
+    /// Set the property DeleteRequested to true. To delete the record the DeleteAsync() 
+    /// need to be called. This intermediate state can be used while a confirmation of
+    /// the user is pending.
+    /// </summary>
+    public void RequestDelete()
+    {
+        DeleteRequested = true;
+        StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
+    }
+
+    public void CancelDelete()
+    {
+        DeleteRequested = false;
+        StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
+    }
+
 
     #endregion
 

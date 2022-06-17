@@ -4,16 +4,13 @@ using System.Reflection;
 namespace EZAccess.Data;
 public class EZField
 {
+    #region Private Fields
     private readonly Type _model;
     private readonly string _fieldName;
     private readonly PropertyInfo _fieldInfo;
+    #endregion
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="model"></param>
-    /// <param name="fieldName"></param>
-    /// <exception cref="ArgumentException"></exception>
+    #region Constructors
     public EZField(Type model, string fieldName)
     {
         _model = model;
@@ -37,6 +34,9 @@ public class EZField
         _fieldName = propertyInfo.Name;
     }
 
+    #endregion
+
+    #region Public Properties
     public Type Model => _model;
     public PropertyInfo FieldInfo => _fieldInfo;
     public string FieldName => _fieldName;
@@ -124,6 +124,8 @@ public class EZField
             return _fieldInfo.GetType();
         }
     }
+
+    #endregion
 }
 
 //AssociatedMetadataTypeTypeDescriptionProvider

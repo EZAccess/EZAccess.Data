@@ -20,6 +20,16 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     public EZRecord<TModel>? CurrentRecord { get; private set; }
 
     /// <summary>
+    /// Returns the number of records in the set.
+    /// </summary>
+    public int RecordCount { 
+        get 
+        { 
+            return Records.Count;
+        } 
+    }
+
+    /// <summary>
     /// Busy during execution of async actions
     /// </summary>
     public bool IsBusy { get; private set; }
@@ -50,7 +60,8 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     /// Allow create if the configuration contains a function to create a new record.
     /// </summary>
     public bool AllowCreate { 
-        get { 
+        get 
+        { 
             return _configuration.CreateRecord is not null; 
         } 
     }
@@ -102,6 +113,9 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
         get { return _invalidRecords.Count; }
     }
 
+    /// <summary>
+    /// Returns the index number of the currently selected record in the set.
+    /// </summary>
     public int CurrentIndex { 
         get {
             if (CurrentRecord == null) {
@@ -110,6 +124,15 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
             else {
                 return Records.IndexOf(CurrentRecord) + 1;
             }
+        } 
+    }
+
+    /// <summary>
+    /// Returns a list of EZField objects containing attribute information of the model fields.
+    /// </summary>
+    public IReadOnlyList<EZField> Fields { 
+        get {
+            return _fields;
         } 
     }
 
@@ -144,6 +167,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     private readonly List<EZRecord<TModel>> _invalidRecords = new();
     private EZRecord<TModel>? _newRecord;
     private readonly EZRecordsetConfiguration<TModel> _configuration;
+    private readonly List<EZField> _fields;
     #endregion
 
     #region Public Events
@@ -163,6 +187,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
         CurrentRecord = Records.FirstOrDefault();
         RefreshRecordSet();
         _configuration = new EZRecordsetConfiguration<TModel>();
+        _fields = EZRecordset<TModel>.FillFieldList();
     }
 
     /// <summary>
@@ -175,6 +200,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
         Data = new List<TModel>();
         Records = new List<EZRecord<TModel>>();
         _configuration = configuration;
+        _fields = EZRecordset<TModel>.FillFieldList();
         if (_configuration.GetAllRecords is null && _configuration.GetRecordsWhere is null)
         {
             throw new InvalidOperationException("The EZRecordset configuration requires either " +
@@ -508,6 +534,21 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     public void RemoveOnChangeListeners(Action<object> listener)
     {
         _onChange -= listener;
+    }
+
+    #endregion
+
+    #region Helper Functions
+    private static List<EZField> FillFieldList()
+    {
+        List<EZField> list = new();
+        var properties = typeof(TModel).GetProperties();
+        foreach (var property in properties)
+        {
+            EZField field = new(typeof(TModel), property);
+            list.Add(field);
+        }
+        return list;
     }
 
     #endregion
