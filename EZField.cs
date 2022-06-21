@@ -10,7 +10,7 @@ public class EZField
     private readonly PropertyInfo _fieldInfo;
     private string? _displayName;           //DisplayAttribute.Name
     private string? _displayShortName;      //DisplayAttribute.Name
-    private bool? _AllowEdit;               //EditableAttribute.AllowEdit
+    private bool? _allowEdit;               //EditableAttribute.AllowEdit
     private string? _dataFormatString;      //DisplayFormatAttribute.DataFormatString
     private string? _nullDisplayText;       //DisplayFormatAttribute.NullDisplayText
     private bool? _key;                     //KeyAttribute
@@ -63,15 +63,56 @@ public class EZField
 
     #endregion
 
+    /// <summary>
+    /// Returns the value of the property in the given context.
+    /// </summary>
+    /// <param name="context">The object of type Model which supplies the values</param>
+    /// <returns>The value as an object</returns>
     public object? Value(object? context)
     {
         var value = _fieldInfo.GetValue(context);
         return value;
     }
 
+    /// <summary>
+    /// Returns the value of the property in the given context. The value is returned as string
+    /// in the supplied DisplayFormat or the default display format.
+    /// </summary>
+    /// <param name="context">The object of type Model which supplies the values</param>
+    /// <param name="dataFormatString">An optional string by which the value is formated</param>
+    /// <returns></returns>
+    public string ValueAsString(object? context, string? dataFormatString = null)
+    {
+        var value = _fieldInfo.GetValue(context);
+        if (value is null) return NullDisplayText;
+        else {
+            if (value is IFormattable) return FormatedValue((IFormattable)value, dataFormatString);
+            else return value.ToString() ?? NullDisplayText;
+        }
+    }
+
+    private string FormatedValue(IFormattable value, string? dataFormatString)
+    {
+        string formatString = dataFormatString is not null ? dataFormatString : DataFormatString;
+        string? result = formatString == string.Empty ? value.ToString() : value.ToString(formatString, null);
+        return result ?? NullDisplayText;
+    }
+
     #region Public Properties
+
+    /// <summary>
+    /// Returns the Type of the model on which the attributes are based
+    /// </summary>
     public Type Model => _model;
+
+    /// <summary>
+    /// Returns the object PropertyInfo for the current property.
+    /// </summary>
     public PropertyInfo FieldInfo => _fieldInfo;
+
+    /// <summary>
+    /// Returns the name of the current property
+    /// </summary>
     public string FieldName => _fieldName;
 
     /// <summary>
@@ -115,13 +156,13 @@ public class EZField
     {
         get
         {
-            if (_AllowEdit is null)
+            if (_allowEdit is null)
             {
                 EditableAttribute? attr = (EditableAttribute?)Attribute.GetCustomAttribute(_fieldInfo, typeof(EditableAttribute));
-                if (attr is not null) _AllowEdit = attr.AllowEdit;
-                if (_AllowEdit is null) _AllowEdit = true;
+                if (attr is not null) _allowEdit = attr.AllowEdit;
+                if (_allowEdit is null) _allowEdit = true;
             }
-            return _AllowEdit ?? true;
+            return _allowEdit ?? true;
         }
     }
 
@@ -310,7 +351,7 @@ public class EZField
     {
         get
         {
-            if (HasRange()) return _rangeMaximum;
+            if (HasRange) return _rangeMaximum;
             else return null;
         }
     }
@@ -322,7 +363,7 @@ public class EZField
     {
         get
         {
-            if (HasRange()) return _rangeMinimum;
+            if (HasRange) return _rangeMinimum;
             else return null;
         }
     }
@@ -334,26 +375,32 @@ public class EZField
     {
         get
         {
-            if (HasRange()) return _rangeType;
+            if (HasRange) return _rangeType;
             else return null;
         }
     }
 
-    private bool HasRange()
+    /// <summary>
+    /// Get the attribute value of RangeAttribute returns whether there is an attribute
+    /// </summary>
+    public bool HasRange 
     {
-        if (_hasRange is null)
+        get
         {
-            RangeAttribute? attr = (RangeAttribute?)Attribute.GetCustomAttribute(_fieldInfo, typeof(RangeAttribute));
-            if (attr is not null)
+            if (_hasRange is null)
             {
-                _hasRange = true;
-                _rangeMaximum = attr.Maximum;
-                _rangeMinimum = attr.Minimum;
-                _rangeType = attr.OperandType;
+                RangeAttribute? attr = (RangeAttribute?)Attribute.GetCustomAttribute(_fieldInfo, typeof(RangeAttribute));
+                if (attr is not null)
+                {
+                    _hasRange = true;
+                    _rangeMaximum = attr.Maximum;
+                    _rangeMinimum = attr.Minimum;
+                    _rangeType = attr.OperandType;
+                }
+                else _hasRange = false;
             }
-            else _hasRange = false;
+            return _hasRange ?? false;
         }
-        return _hasRange ?? false;
     }
 
     /// <summary>
@@ -400,7 +447,7 @@ public class EZField
     {
         get
         {
-            if (HasStringLength()) return _stringMaxLength;
+            if (HasStringLength) return _stringMaxLength;
             else return null;
         }
     }
@@ -412,25 +459,31 @@ public class EZField
     {
         get
         {
-            if (HasStringLength()) return _stringMinLength;
+            if (HasStringLength) return _stringMinLength;
             else return null;
         }
     }
 
-    private bool HasStringLength()
+    /// <summary>
+    /// Get the attribute value of StringLengthAttribute and returns whether there is an attribute
+    /// </summary>
+    private bool HasStringLength
     {
-        if (_hasStringLength is null)
+        get
         {
-            StringLengthAttribute? attr = (StringLengthAttribute?)Attribute.GetCustomAttribute(_fieldInfo, typeof(StringLengthAttribute));
-            if (attr is not null)
+            if (_hasStringLength is null)
             {
-                _stringMaxLength = attr.MaximumLength;
-                _stringMinLength = attr.MinimumLength;
-                _hasStringLength = true;
+                StringLengthAttribute? attr = (StringLengthAttribute?)Attribute.GetCustomAttribute(_fieldInfo, typeof(StringLengthAttribute));
+                if (attr is not null)
+                {
+                    _stringMaxLength = attr.MaximumLength;
+                    _stringMinLength = attr.MinimumLength;
+                    _hasStringLength = true;
+                }
+                else _hasStringLength = false;
             }
-            else _hasStringLength = false;
+            return _hasStringLength ?? false;
         }
-        return _hasStringLength ?? false;
     }
 
     /// <summary>

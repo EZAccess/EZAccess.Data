@@ -130,7 +130,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     /// <summary>
     /// Returns a list of EZField objects containing attribute information of the model fields.
     /// </summary>
-    public IReadOnlyList<EZField> Fields { 
+    public Dictionary<string, EZField> Fields { 
         get {
             return _fields;
         } 
@@ -167,7 +167,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     private readonly List<EZRecord<TModel>> _invalidRecords = new();
     private EZRecord<TModel>? _newRecord;
     private readonly EZRecordsetConfiguration<TModel> _configuration;
-    private readonly List<EZField> _fields;
+    private readonly Dictionary<string, EZField> _fields;
     #endregion
 
     #region Public Events
@@ -578,14 +578,14 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     #endregion
 
     #region Helper Functions
-    private static List<EZField> FillFieldList()
+    private static Dictionary<string, EZField> FillFieldList()
     {
-        List<EZField> list = new();
+        Dictionary<string, EZField> list = new();
         var properties = typeof(TModel).GetProperties();
         foreach (var property in properties)
         {
             EZField field = new(typeof(TModel), property);
-            list.Add(field);
+            list.Add(property.Name, field);
         }
         return list;
     }
