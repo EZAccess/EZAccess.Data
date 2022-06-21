@@ -73,7 +73,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     public bool AllowRead {
         get
         {
-            return _configuration.ReadRecord is not null;
+            return _configuration.GetRecord is not null;
         }
     }
 
@@ -211,11 +211,12 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
             throw new InvalidOperationException("The EZRecordset configuration requires " +
                 "an UpdateRecord function if a CreateRecord function is provided!");
         }
-        if (_configuration.UpdateRecord is not null && _configuration.ReadRecord is null)
+        if (_configuration.UpdateRecord is not null && _configuration.GetRecord is null)
         {
             throw new InvalidOperationException("The EZRecordset configuration requires " +
                 "a ReadRecord function if an UpdateRecord function is provided!");
         }
+        if (!_configuration.AwaitResult) StartRefreshData();
     }
 
     #endregion
@@ -336,7 +337,7 @@ public class EZRecordset<TModel> : IDisposable where TModel : new()
     private EZRecord<TModel>? AddNewRecord(TModel newModel)
     {
         if (_configuration.CreateRecord != null && 
-            _configuration.ReadRecord != null && 
+            _configuration.GetRecord != null && 
             _configuration.UpdateRecord != null && 
             _configuration.DeleteRecord != null)
         {

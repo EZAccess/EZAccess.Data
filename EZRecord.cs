@@ -111,7 +111,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
     {
         get
         {
-            return _configuration.ReadRecord is not null;
+            return _configuration.GetRecord is not null;
         }
     }
 
@@ -306,7 +306,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 await DeleteAsync();
                 return;
             }
-            if (_configuration.ReadRecord != null && IsChanged)
+            if (_configuration.GetRecord != null && IsChanged)
             {
                 HasFailedOperation = false;
                 IsBusy = true;
@@ -315,7 +315,7 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 OnBeforeUndo?.Invoke(this, args);
                 if (!args.Cancel)
                 {
-                    var result = await _configuration.ReadRecord(Model);
+                    var result = await _configuration.GetRecord(Model);
                     if (result.IsSuccess && result.Content != null)
                     {
                         Model = result.Content;
@@ -371,13 +371,13 @@ public class EZRecord<TModel> : IDisposable where TModel : new()
                 HasFailedOperation = false;
                 IsBusy = true;
                 StateHasChanged?.Invoke(this, new EZStateHasChangedEventArgs(this) { NoFocus = true });
-                if (_configuration.ReadRecord != null)
+                if (_configuration.GetRecord != null)
                 {
                     BeforeCRUDEventArgs<TModel> args = new(Model);
                     OnBeforeRefresh?.Invoke(this, args);
                     if (!args.Cancel)
                     {
-                        var result = await _configuration.ReadRecord(Model);
+                        var result = await _configuration.GetRecord(Model);
                         if (result.IsSuccess && result.Content != null)
                         {
                             Model = result.Content;
