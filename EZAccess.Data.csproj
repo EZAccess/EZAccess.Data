@@ -14,7 +14,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>Httpservice; Recordset; Data Access; Data helpers</PackageTags>
     <PackageReleaseNotes>Initial release with basic functionality for recordsets and http requests</PackageReleaseNotes>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
