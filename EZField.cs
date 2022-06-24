@@ -142,7 +142,10 @@ public class EZField
             if (_displayShortName is null)
             {
                 DisplayAttribute? attr = (DisplayAttribute?)Attribute.GetCustomAttribute(_fieldInfo, typeof(DisplayAttribute));
-                if (attr is not null) _displayShortName = attr?.ShortName;
+                if (attr is not null)
+                {
+                    _displayShortName = attr?.ShortName ?? attr?.Name;
+                }
                 if (_displayShortName is null) _displayShortName = _fieldName;
             }
             return _displayShortName;
